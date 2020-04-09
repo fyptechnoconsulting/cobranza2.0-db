@@ -1,15 +1,21 @@
--- Function: cobros.genera_datos_archivo_cobro_bod(character varying, date, date, numeric, character varying)
+-- FUNCTION: cobros.genera_datos_archivo_cobro_bod(character varying, date, date, numeric, character varying)
 
 -- DROP FUNCTION cobros.genera_datos_archivo_cobro_bod(character varying, date, date, numeric, character varying);
 
 CREATE OR REPLACE FUNCTION cobros.genera_datos_archivo_cobro_bod(
-    co_banco character varying DEFAULT '0116'::character varying,
-    fe_cobro date DEFAULT ('now'::text)::date,
-    fe_envio date DEFAULT ('now'::text)::date,
-    co_frecuencia_pago numeric DEFAULT 0,
-    nu_cuenta_abadia character varying DEFAULT 'XXXXXXXXXXXXXX'::character varying)
-  RETURNS void AS
-$BODY$
+	co_banco character varying DEFAULT '0116'::character varying,
+	fe_cobro date DEFAULT (
+	'now'::text)::date,
+	fe_envio date DEFAULT (
+	'now'::text)::date,
+	co_frecuencia_pago numeric DEFAULT 0,
+	nu_cuenta_abadia character varying DEFAULT 'XXXXXXXXXXXXXX'::character varying)
+    RETURNS void
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+AS $BODY$
 declare
   total_cuotas        numeric; --ACUMULADOR DE MONTO TOTAL DE CUOTAS SIN CONVENIO
   total_convenios     numeric; --ACUMULADOR DE MONTO TOTAL DE CUOTAS CON CONVENIO
@@ -36,7 +42,8 @@ else
 end if;
 
 --OBTIENE EL MONTO TOTAL DE CUOTAS PARA SER INCLUIDO EN EL REGISTRO RESUMEN
-select sum(tc.monto_cuota), count(tc.co_cuota) into total_cuotas,registros_cuotas
+select (CASE WHEN sum(tc.monto_cuota) is null THEN 0
+        ELSE sum(tc.monto_cuota) END), count(tc.co_cuota)  into total_cuotas, registros_cuotas
 from cobros.tmp_cuota tc join cobros.titular ti on (co_cuenta = nu_cuenta)
 	left outer join cobros.convenio co on (tc.co_cuenta = co.nu_cuenta),
 	cobros.archivo ar 
@@ -46,9 +53,9 @@ and ar.co_archivo = (select max(ar2.co_archivo) from cobros.archivo ar2 where ar
 --and co.nu_cuenta is null;
 and ti.nu_contrato not in (select nu_contrato from cobros.convenio co where $2 between co.fe_inicio and co.fe_fin);
 
-
 --OBTIENE EL MONTO TOTAL DE CONVENIOS PARA SER INCLUIDO EN EL REGISTRO RESUMEN
-select sum(totales.monto_cuota), count(totales.co_cuota) into total_convenios, registros_convenios
+select (CASE WHEN sum(totales.monto_cuota) is null THEN 0
+        ELSE sum(totales.monto_cuota) END), count(totales.co_cuota) into total_convenios, registros_convenios
 from(
      select co_cuota,co_cuenta, monto_cuota, tc.fe_cobro, ti.id_titular , ti.nu_contrato 
      from cobros.tmp_cuota tc join cobros.titular ti on (tc.co_cuenta = ti.nu_cuenta)
@@ -72,7 +79,6 @@ from(
      and ar.co_archivo = (select max(ar2.co_archivo) from cobros.archivo ar2 where ar2.co_banco = $1)
      and ti.nu_contrato in (select nu_contrato from cobros.convenio co where $2 between co.fe_inicio and co.fe_fin )
     ) as totales;
-
 
 --INICIA SECUENCIA DE NUMERACION PARA LOS REGISTROS DEL ARCHIVO (DETALLE)
 ALTER SEQUENCE cobros.archivo_detalle_nu_regstro_seq RESTART WITH 1;
@@ -114,7 +120,6 @@ and substring(tc.co_cuenta,1,4) = $1 and ti.co_dia_debito = $4 and tc.valor_pago
 and ar.co_archivo = (select max(ar2.co_archivo) from cobros.archivo ar2 where ar2.co_banco = $1)
 --and co.nu_cuenta is null;
 and ti.nu_contrato not in (select nu_contrato from cobros.convenio co where $2 between co.fe_inicio and co.fe_fin);
-
 
 --INSERTA CUOTAS  CORRESPONDIENTES A CONVENIO DE PAGO
 insert into cobros.archivo_detalle(co_archivo,tx_registro_cobro,co_banco,monto_cuota)
@@ -161,9 +166,7 @@ insert into cobros.archivo_detalle(co_archivo,tx_registro_cobro,co_banco,monto_c
 --select co_archivo into co_archivo from cobros.archivo where co_archivo = (select max(ar2.co_archivo) from cobros.archivo ar2 where ar2.co_banco = $1);
 --return (co_archivo);
 end;
-$BODY$
-  LANGUAGE plpgsql VOLATILE
-  COST 100;
-ALTER FUNCTION cobros.genera_datos_archivo_cobro_bod(character varying, date, date, numeric, character varying)
-  OWNER TO postgres;
+$BODY$;
 
+ALTER FUNCTION cobros.genera_datos_archivo_cobro_bod(character varying, date, date, numeric, character varying)
+    OWNER TO postgres;
