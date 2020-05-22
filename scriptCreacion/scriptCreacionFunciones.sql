@@ -41,6 +41,10 @@ else
    SELECT to_char( (date_trunc('MONTH', ($2)::date) + INTERVAL '1 MONTH - 1 day')::DATE ,'dd-mm-yyyy') into fe_fin_busq; 
 end if;
 
+if $4 = 1  or $4 = 2 or $4 = 4 or $4 = 5 or $4 = 7 or $4 = 8 or $4 = 10 or $4 = 11 then
+  fe_ini_busq := '01-'||to_char($2,'mm')||'-'||to_char($2,'yyyy');
+end if;
+
 --OBTIENE EL MONTO TOTAL DE CUOTAS PARA SER INCLUIDO EN EL REGISTRO RESUMEN
 select (CASE WHEN sum(tc.monto_cuota) is null THEN 0
         ELSE sum(tc.monto_cuota) END), count(tc.co_cuota)  into total_cuotas, registros_cuotas
@@ -48,6 +52,7 @@ from cobros.tmp_cuota tc join cobros.titular ti on (co_cuenta = nu_cuenta)
 	left outer join cobros.convenio co on (tc.co_cuenta = co.nu_cuenta),
 	cobros.archivo ar 
 where to_date(tc.fe_cobro,'dd-mm-yyyy') between to_date(fe_ini_busq,'dd-mm-yyyy') and to_date(fe_fin_busq,'dd-mm-yyyy')
+and ti.co_estado_contrato <> 4
 and substring(tc.co_cuenta,1,4) = $1 and ti.co_dia_debito = $4 and tc.valor_pago = 0 
 and ar.co_archivo = (select max(ar2.co_archivo) from cobros.archivo ar2 where ar2.co_banco = $1)
 --and co.nu_cuenta is null;
@@ -116,6 +121,7 @@ from cobros.tmp_cuota tc join cobros.titular ti on (co_cuenta = nu_cuenta)
      left outer join cobros.convenio co on (tc.co_cuenta = co.nu_cuenta), 
      cobros.archivo ar 
 where to_date(tc.fe_cobro,'dd-mm-yyyy') between to_date(fe_ini_busq,'dd-mm-yyyy') and to_date(fe_fin_busq,'dd-mm-yyyy')
+and ti.co_estado_contrato <> 4
 and substring(tc.co_cuenta,1,4) = $1 and ti.co_dia_debito = $4 and tc.valor_pago = 0 
 and ar.co_archivo = (select max(ar2.co_archivo) from cobros.archivo ar2 where ar2.co_banco = $1)
 --and co.nu_cuenta is null;
