@@ -22,9 +22,11 @@ declare
   registros_cuotas    numeric; --ACUMULADOR DE NUMEROS DE REGISTROS DE CUOTAS SIN CONVENIO
   registros_convenios numeric; --ACUMULADOR DE NUMEROS DE REGISTROS DE CUOTAS CON CONVENIO
   fe_ini_busq	      varchar; --FECHA DE INICIO PARA LA BUSQUEDA DE CUOTAS
-  fe_fin_busq	      varchar; --FECHA DE INICIO PARA LA BUSQUEDA DE CUOTAS
+  fe_fin_busq	      varchar; --FECHA DE FIN PARA LA BUSQUEDA DE CUOTAS
   dia_cobro	      float; -- DIA DE COBRO
   --co_archivo	      integer;
+  diaSemana integer;
+  cantDias integer;
 begin
 
 --CREA REGISTRO IDENTICADOR DE ARCHIVO
@@ -44,6 +46,16 @@ end if;
 if $4 = 1  or $4 = 2 or $4 = 4 or $4 = 5 or $4 = 7 or $4 = 8 or $4 = 10 or $4 = 11 then
   fe_ini_busq := '01-'||to_char($2,'mm')||'-'||to_char($2,'yyyy');
 end if;
+
+if $4 = 12 then
+  select extract(DOW FROM DATE ($2)::date) into diaSemana;
+  cantDias := 6 - diaSemana;
+  select to_char(((date ($2)::date) - diaSemana),'dd-mm-yyyy') into fe_ini_busq;
+  select to_char(((date ($2)::date) + cantDias),'dd-mm-yyyy')  into fe_fin_busq;
+end if;	
+
+--RAISE NOTICE 'INICIO %', fe_ini_busq ;
+--RAISE NOTICE 'FNI %', fe_fin_busq ;
 
 --OBTIENE EL MONTO TOTAL DE CUOTAS PARA SER INCLUIDO EN EL REGISTRO RESUMEN
 select (CASE WHEN sum(tc.monto_cuota) is null THEN 0
